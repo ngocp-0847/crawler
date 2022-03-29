@@ -1,0 +1,14 @@
+[
+    {
+        "ParameterKey": "VpcID",
+        "ParameterValue": "vpc-021a347ed1bd685be"
+    },
+    {
+        "ParameterKey": "SubnetIDs",
+        "ParameterValue": ["subnet-0948e638719be6b91", "subnet-0b4af303b562bb098"]
+    },
+    {
+        "ParameterKey": "MYSQL_USERNAME",
+        "ParameterValue": "phann123"
+    }
+]

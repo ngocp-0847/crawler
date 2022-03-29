@@ -1,0 +1,4 @@
+requests
+scrapy
+peewee
+beautifulsoup4

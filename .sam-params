@@ -1,0 +1,3 @@
+VpcID = vpc-021a347ed1bd685be
+SubnetIDs = ["subnet-0948e638719be6b91", "subnet-0b4af303b562bb098"]
+MYSQL_USERNAME = phann123

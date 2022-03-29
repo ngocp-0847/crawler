@@ -1,0 +1,21 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "check-custom"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-eim7p21ni1gv"
+s3_prefix = "check-custom"
+region = "us-east-2"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+image_repositories = []
+parameter_overrides = [
+    "PrivateSubnetIDs=\"subnet-0948e638719be6b91, subnet-0b4af303b562bb098\"",
+    "PublicSubnetIDs=\"subnet-0053fc648baf36faf, subnet-0193b48e996a97019\"",
+    "VpcID=vpc-021a347ed1bd685be",
+    "MysqlUsername=phann123",
+    "MysqlPassword=3.qY77TTM=A=HcW*",
+    "MysqlDatabase=db_crawler",
+    "EnvironmentType=development",
+    "SubnetInstanceId=subnet-0053fc648baf36faf"
+]

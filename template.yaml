@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  check-custom
+
+  Sample SAM Template for check-custom
+
+Parameters:
+  VpcID:
+    Type: String
+    Default: none
+  PrivateSubnetIDs:
+    Description: The array of Subnet IDs for the Subnet group
+    Type: CommaDelimitedList
+  PublicSubnetIDs:
+    Description: The array of Subnet IDs for the public subnet group
+    Type: CommaDelimitedList
+  MysqlUsername:
+    Type: String
+    Default: none
+  MysqlPassword:
+    Type: String
+    Default: none
+  MysqlDatabase:
+    Type: String
+    Default: none
+  EnvironmentType:
+    Type: String
+    Default: none
+  LatestAmiId:
+    Type:  'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  SubnetInstanceId:
+    Description: The array of Subnet IDs for the Subnet Instance
+    Type: String
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  LambdaCustomChangeUrlRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: 'Allow'
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'LambdaCustomRolePolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 's3:*'
+                Resource:
+                - !Sub "arn:aws:s3:::bomt3r-website-bucket"
+                - !Sub "arn:aws:s3:::bomt3r-website-bucket/*"
+              - Effect: 'Allow'
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+  SiteSourceCheckUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello_world/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64          
+      Role: !GetAtt LambdaCustomChangeUrlRole.Arn
+      AutoPublishAlias: live
+      Timeout: 600
+  
+  S3ChangeUrlResource:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt SiteSourceCheckUrl.Arn
+      Version: !Ref "SiteSourceCheckUrl.Version"
+      API_ENDPOINT: !Sub "https://ttt.execute-api.${AWS::Region}.amazonaws.com/Prod"
+      S3_BUCKET: "bomt3r-website-bucket"
+
+  Crawler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: crawler/
+      Handler: app.lambda_handler
+      Runtime: python3.6
+      Architectures:
+        - x86_64          
+      Role: !GetAtt LambdaCrawlerRole.Arn
+      AutoPublishAlias: live
+      Timeout: 600
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref WebAppSecurityGroup
+        SubnetIds: !Ref PublicSubnetIDs
+      Environment:
+        Variables:
+          MYSQL_ENDPOINT: !GetAtt MySqlDB.Endpoint.Address
+          MYSQL_USERNAME: !Ref MysqlUsername
+          MYSQL_PASSWORD: !Ref MysqlPassword
+          MYSQL_DATABASE: !Ref MysqlDatabase
+
+  LambdaCrawlerRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: 'Allow'
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'LambdaCustomRolePolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 's3:*'
+                Resource:
+                - !Sub "arn:aws:s3:::bomt3r-website-bucket"
+                - !Sub "arn:aws:s3:::bomt3r-website-bucket/*"
+              - Effect: 'Allow'
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: 'Allow'
+                Action:
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                Resource: '*'
+
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcID
+      GroupDescription: Open database for access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        CidrIp: 0.0.0.0/0
+
+  MySqlDBSubnetGroup: 
+    Properties: 
+      DBSubnetGroupDescription: description
+      SubnetIds: !Ref PrivateSubnetIDs
+    Type: "AWS::RDS::DBSubnetGroup"
+
+  RDSDBParameterGroup:
+    Type: 'AWS::RDS::DBParameterGroup'
+    Properties:
+      Description: CloudFormation Sample MySQL Parameter Group
+      Family: mysql5.7
+      Parameters:
+        sql_mode: IGNORE_SPACE
+        max_allowed_packet: 1024
+        
+  MySqlDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: crawlerdata
+      DBSubnetGroupName: !Ref MySqlDBSubnetGroup
+      DBParameterGroupName: !Ref RDSDBParameterGroup
+      VPCSecurityGroups:
+      - Ref: DBEC2SecurityGroup
+      AllocatedStorage: '5'
+      # StorageType: gp2
+      DBInstanceClass: db.t2.micro
+      Engine: MySQL
+      EngineVersion: 5.7
+      MasterUsername: !Ref MysqlUsername
+      MasterUserPassword: !Ref MysqlPassword
+      DBName: !Ref MysqlDatabase
+    DeletionPolicy: Delete
+
+  Ec2Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: 'Allow'
+          Principal:
+            Service: 'ec2.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'RDSRolePolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: 'Allow'
+                Action:
+                - rds:*
+                Resource: '*'
+  EcInstanceProfile: 
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      Path: "/"
+      Roles: 
+        - 
+          Ref: "Ec2Role"
+
+  WebAppInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref 'LatestAmiId'
+      InstanceType: t2.micro
+      KeyName: pn-lab
+      SecurityGroupIds:
+        - !Ref WebAppSecurityGroup
+      SubnetId: !Ref SubnetInstanceId
+      IamInstanceProfile: !Ref EcInstanceProfile
+      BlockDeviceMappings: 
+      - DeviceName: "/dev/xvda"
+        Ebs: 
+          VolumeType: "gp2"
+          VolumeSize: "8"
+
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcID
+      GroupName: !Join ["-", [webapp-security-group, !Ref EnvironmentType]]
+      GroupDescription: "Allow HTTP/HTTPS and SSH inbound and outbound traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  HelloWorldFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt SiteSourceCheckUrl.Arn
