@@ -1,5 +1,5 @@
 from scrapy.crawler import CrawlerProcess
-from lib.crawl import GenkSpider, VnExpressSpider, Kenh14Spider, DantriSpider, DevToApi, ThanhnienSpider    
+from libc.crawl import GenkSpider, VnExpressSpider, Kenh14Spider, DantriSpider, DevToApi, ThanhnienSpider    
 
 def lambda_handler(event, context):
     print(event)
