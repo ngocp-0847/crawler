@@ -98,10 +98,10 @@ Resources:
       Role: !GetAtt LambdaCrawlerRole.Arn
       AutoPublishAlias: live
       Timeout: 600
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref WebAppSecurityGroup
-        SubnetIds: !Ref PublicSubnetIDs
+      # VpcConfig:
+      #   SecurityGroupIds:
+      #     - !Ref WebAppSecurityGroup
+      #   SubnetIds: !Ref PublicSubnetIDs
       Environment:
         Variables:
           MYSQL_ENDPOINT: !GetAtt MySqlDB.Endpoint.Address
@@ -127,9 +127,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: 's3:*'
-                Resource:
-                - !Sub "arn:aws:s3:::bomt3r-website-bucket"
-                - !Sub "arn:aws:s3:::bomt3r-website-bucket/*"
+                Resource: '*'
               - Effect: 'Allow'
                 Action:
                 - logs:CreateLogGroup
@@ -141,6 +139,10 @@ Resources:
                 - ec2:CreateNetworkInterface
                 - ec2:DescribeNetworkInterfaces
                 - ec2:DeleteNetworkInterface
+                Resource: '*'
+              - Effect: 'Allow'
+                Action:
+                - rds:*
                 Resource: '*'
 
   DBEC2SecurityGroup:
@@ -167,7 +169,7 @@ Resources:
       Family: mysql5.7
       Parameters:
         sql_mode: IGNORE_SPACE
-        max_allowed_packet: 1024
+        max_allowed_packet: 524288
         
   MySqlDB:
     Type: AWS::RDS::DBInstance
@@ -178,10 +180,11 @@ Resources:
       VPCSecurityGroups:
       - Ref: DBEC2SecurityGroup
       AllocatedStorage: '5'
-      # StorageType: gp2
+      StorageType: gp2
       DBInstanceClass: db.t2.micro
       Engine: MySQL
       EngineVersion: 5.7
+      BackupRetentionPeriod: 0
       MasterUsername: !Ref MysqlUsername
       MasterUserPassword: !Ref MysqlPassword
       DBName: !Ref MysqlDatabase
